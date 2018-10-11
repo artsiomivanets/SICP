@@ -4,8 +4,6 @@
 
 (define (fast-exp num n)
   (define (fast-exp-iter product num n)
-    (display 1)
-    (display newline)
     (cond ((= n 0) product)
           ((even? n)
            (fast-exp-iter product (square num) (/ n 2)))
