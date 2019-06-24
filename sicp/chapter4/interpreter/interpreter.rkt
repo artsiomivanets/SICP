@@ -107,8 +107,8 @@
         ((seq? expr) (eval#-seq expr env))
         ((application? expr)
          (eval#-application (eval# (operator expr) env)
-                              (map (lambda (operand) (eval# operand env))
-                                   (operands expr))))
+                            (map (lambda (operand) (eval# operand env))
+                                 (operands expr))))
         (else (error "undefined type of expression"))))
 
 (define (eval#-self expr env) expr)
@@ -148,18 +148,18 @@
         (body (let-body expr))
         (vals (let-values expr)))
     (eval# (cons (make-lambda args body)
-                   vals) env)))
+                 vals) env)))
 
 (define (eval#-let# expr env)
   (let ((args (let-args expr))
         (body (let-body expr))
         (vals (let-values expr)))
     (define (iter args vals)
-      (if (null? (cdr args))
-           (cons (make-lambda (caar args) body)
-                 (cdar args))
-           (cons (make-lambda (car args) (iter (cdr args) (cdr vals)))
-                 (car vals))))
+      (if (null? args)
+          body
+          (cons (make-lambda (list (car args))
+                             (iter (cdr args) (cdr vals)))
+                (list (car vals)))))
     (eval# (iter args vals) env)))
 
 (define (eval#-if expr env)
@@ -218,7 +218,7 @@
       (caddr expr)))
 
 (define (let#? expr)
-  (tagged-list? expr 'let#))
+  (tagged-list? expr 'let*))
 
 (define (let? expr)
   (tagged-list? expr 'let))
