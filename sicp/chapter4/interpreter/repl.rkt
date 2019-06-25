@@ -7,7 +7,7 @@
 (define (driver-loop)
   (display "> ")
   (let ((input (read)))
-   (displayln (my-eval input the-global-env)))
+   (displayln (eval* input the-global-env)))
   (driver-loop))
 
 (driver-loop)

@@ -48,6 +48,25 @@
           (b (set! a 2)))
      a))
 
+(define counter
+  '(
+    (define a 1)
+    (define (get-counter)
+      (lambda () (set! a 2)))
+    (define count (get-counter))
+    (count)
+    a
+    ))
+
+(define complex-counter
+  '(
+    (define (get-counter start)
+      (lambda () ((set! start (+ start 1)) start)))
+    (define count (get-counter 0))
+    (count)
+    (count)
+    ))
+
 (check-equal? (interpreter expr) 3)
 (check-equal? (interpreter simple-list) (list 1 2))
 (check-equal? (interpreter simple-cons) (cons 1 2))
@@ -63,3 +82,5 @@
 (check-equal? (interpreter simple-let) 3)
 (check-equal? (interpreter complex-let) 3)
 (check-equal? (interpreter complex-let-with-set) 2)
+(check-equal? (interpreter counter) 2)
+(check-equal? (interpreter complex-counter) 2)

@@ -5,18 +5,19 @@
 ;========================================================
 
 (define primitives
-  (list (list '+ +)
-        (list '- -)
-        (list '* *)
-        (list '/ /)
-        (list '> >)
-        (list '< <)
-        (list '= =)
-        (list 'cons cons)
-        (list 'car car)
-        (list 'cdr cdr)
-        (list 'list list)
-        (list 'null? null?)))
+  (list
+    (list '+ +)
+    (list '- -)
+    (list '* *)
+    (list '/ /)
+    (list '> >)
+    (list '< <)
+    (list '= =)
+    (list 'cons cons)
+    (list 'car car)
+    (list 'cdr cdr)
+    (list 'list list)
+    (list 'null? null?)))
 (define primitive-names (map car primitives))
 (define primitive-values (map cadr primitives))
 
@@ -27,17 +28,18 @@
 (define the-empty-env '())
 
 (define (make-env frame parent)
-  (list frame parent))
+  (cons frame parent))
 
 (define (empty-env? env) (null? env))
 
-(define (parent-env env) (cadr env))
+(define (parent-env env) (cdr env))
 
 (define (first-frame env) (car env))
 
 (define (setup-env)
   (let ((frame (make-frame primitive-names primitive-values)))
-   (make-env frame the-empty-env)))
+   (let ((env (make-env frame the-empty-env)))
+    env)))
 
 (define (extend-env params args env)
   (let ((frame (make-frame params args)))
@@ -45,12 +47,14 @@
     new-env)))
 
 (define (find-variable var env callback)
-  (if (empty-env? env)
-      (error "Variable is unbound")
-      (let ((frame (first-frame env)))
-       (if (frame-has-var? frame var)
-           (callback frame var)
-           (lookup-variable-value var (parent-env env))))))
+  (cond ((empty-env? env)
+         (error "Variable is unbound"))
+        (else
+          (let ((frame (first-frame env)))
+           (cond ((frame-has-var? frame var)
+                  (callback frame var))
+                 (else
+                   (find-variable var (parent-env env) callback)))))))
 
 (define (lookup-variable-value var env)
   (find-variable var env get-frame-var))
@@ -93,30 +97,30 @@
 
 
 ;========================================================
-;                   eval#
+;                   eval
 ;========================================================
-(define (eval# expr env)
-  (cond ((self-eval#uating? expr) (eval#-self expr env))
-        ((variable? expr) (eval#-var expr env))
-        ((definition? expr) (eval#-definition expr env))
-        ((assignment? expr) (eval#-assignment expr env))
-        ((let#? expr) (eval#-let# expr env))
-        ((let? expr) (eval#-let expr env))
-        ((lambda? expr) (eval#-lambda expr env))
-        ((if? expr) (eval#-if expr env))
-        ((seq? expr) (eval#-seq expr env))
+(define (eval* expr env)
+  (cond ((self-evaluating? expr) (eval-self expr env))
+        ((variable? expr) (eval-var expr env))
+        ((definition? expr) (eval-definition expr env))
+        ((assignment? expr) (eval-assignment expr env))
+        ((let*? expr) (eval-let* expr env))
+        ((let? expr) (eval-let expr env))
+        ((lambda? expr) (eval-lambda expr env))
+        ((if? expr) (eval-if expr env))
+        ((seq? expr) (eval-seq expr env))
         ((application? expr)
-         (eval#-application (eval# (operator expr) env)
-                            (map (lambda (operand) (eval# operand env))
-                                 (operands expr))))
+         (eval-application (eval* (operator expr) env)
+                           (map (lambda (operand) (eval* operand env))
+                                (operands expr))))
         (else (error "undefined type of expression"))))
 
-(define (eval#-self expr env) expr)
+(define (eval-self expr env) expr)
 
-(define (eval#-var expr env)
+(define (eval-var expr env)
   (lookup-variable-value expr env))
 
-(define (eval#-application proc args)
+(define (eval-application proc args)
   (cond ((primitive-procedure? proc)
          (apply proc args))
         (else
@@ -124,33 +128,33 @@
                 (env (extend-env (procedure-params proc)
                                  args
                                  (procedure-env proc))))
-            (eval# expr env)))))
+            (eval* expr env)))))
 
-(define (eval#-definition expr env)
+(define (eval-definition expr env)
   (let ((var (definition-var expr))
-        (val (eval# (definition-val expr) env)))
+        (val (eval* (definition-val expr) env)))
     (def-variable! var val env)
     'ok))
 
-(define (eval#-assignment expr env)
+(define (eval-assignment expr env)
   (let ((var (assignment-var expr))
-        (val (eval# (assignment-val expr) env)))
+        (val (eval* (assignment-val expr) env)))
     (set-variable-value! var val env)
     'ok))
 
-(define (eval#-lambda expr env)
+(define (eval-lambda expr env)
   (let ((args (lambda-args expr))
         (body (lambda-body expr)))
     (make-procedure args body env)))
 
-(define (eval#-let expr env)
+(define (eval-let expr env)
   (let ((args (let-args expr))
         (body (let-body expr))
         (vals (let-values expr)))
-    (eval# (cons (make-lambda args body)
+    (eval* (cons (make-lambda args body)
                  vals) env)))
 
-(define (eval#-let# expr env)
+(define (eval-let* expr env)
   (let ((args (let-args expr))
         (body (let-body expr))
         (vals (let-values expr)))
@@ -160,20 +164,20 @@
           (cons (make-lambda (list (car args))
                              (iter (cdr args) (cdr vals)))
                 (list (car vals)))))
-    (eval# (iter args vals) env)))
+    (eval* (iter args vals) env)))
 
-(define (eval#-if expr env)
-  (let ((predicate (eval# (if-predicate expr) env)))
+(define (eval-if expr env)
+  (let ((predicate (eval* (if-predicate expr) env)))
    (if (true? predicate)
-       (eval# (if-consequence expr) env)
-       (eval# (if-alternative expr) env))))
+       (eval* (if-consequence expr) env)
+       (eval* (if-alternative expr) env))))
 
-(define (eval#-seq expr env)
+(define (eval-seq expr env)
   (cond ((null? (cdr expr))
-         (eval# (car expr) env))
+         (eval* (car expr) env))
         (else
-          (eval# (car expr) env)
-          (eval#-seq (cdr expr) env))))
+          (eval* (car expr) env)
+          (eval-seq (cdr expr) env))))
 
 (define (true? expr)
   (not (eq? expr #f)))
@@ -181,7 +185,7 @@
 (define (false? expr)
   (eq? expr #f))
 
-(define (self-eval#uating? expr)
+(define (self-evaluating? expr)
   (cond ((number? expr) #t)
         ((string? expr) #t)
         (else #f)))
@@ -217,7 +221,7 @@
                    (caddr expr))
       (caddr expr)))
 
-(define (let#? expr)
+(define (let*? expr)
   (tagged-list? expr 'let*))
 
 (define (let? expr)
@@ -258,7 +262,7 @@
 (define (operands expr) (cdr expr))
 
 (define (interpreter expr)
-  (eval# expr (setup-env)))
+  (eval* expr (setup-env)))
 
-(provide interpreter eval# setup-env)
+(provide interpreter eval* setup-env)
 
